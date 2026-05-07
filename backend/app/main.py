@@ -18,7 +18,7 @@ def get_db():
 
 @app.get("/")
 def read_root():
-    return {"message": "AI Claims Processor Backend is Running"}
+    return {"status": "ok"}
 
 @app.post("/claims/", response_model=schemas.Claim)
 def create_claim(claim: schemas.ClaimCreate, db: Session = Depends(get_db)):

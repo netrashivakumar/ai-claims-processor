@@ -16,3 +16,9 @@ def test_get_claims():
     # Verifies that it returns a list (even if empty)
     assert isinstance(response.json(), list)
 
+def test_read_root():
+    # This 'hits' the root endpoint of your API
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
