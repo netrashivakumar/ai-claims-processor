@@ -7,3 +7,4 @@ langchain
 openai
 pytest
 flake8
+python-dotenv
