@@ -1,21 +1,21 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from . import models, schemas, database
-from .database import engine, SessionLocal
+from .database import engine, SessionLocal, get_db
 
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="AI Claims Processor")
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, replace "*" with your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 @app.get("/")
 def read_root():
     return {"status": "ok"}
@@ -38,7 +38,7 @@ def update_claim(id: int, updated_data: schemas.ClaimUpdate, db: Session = Depen
         raise HTTPException(status_code=404, detail="Claim not found")
 
     # Update logic
-    update_dict = updated_data.dict(exclude_unset=True)
+    update_dict = updated_data.model_dump(exclude_unset=True)
     for key, value in update_dict.items():
         setattr(db_claim, key, value)
 
