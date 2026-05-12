@@ -3,7 +3,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from . import models, schemas, database
-from .database import engine, SessionLocal, get_db
+from .database import engine, SessionLocal, get_db, initialize_vector_extension
+
+# This ensures the extension exists before tables are created
+initialize_vector_extension()
 
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)

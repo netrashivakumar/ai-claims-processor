@@ -20,6 +20,7 @@ if not SQLALCHEMY_DATABASE_URL:
     raise ValueError(f"Could not load .env at {env_path}")
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 Base = declarative_base()
 
 def get_db():
@@ -33,3 +34,7 @@ def initialize_vector_extension():
     with engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
         conn.commit()
+
+# 2. CALL the function right here
+# This ensures it runs as soon as the database.py is imported
+initialize_vector_extension()
