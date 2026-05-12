@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  # RabbitMQ Broker
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: claims-broker
+    ports:
+      - "5672:5672"   # Standard RabbitMQ port
+      - "15672:15672" # Management UI (Dashboard) port
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
+  # Your Postgres Database (adding it here for future orchestration)
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: claims-db
+    environment:
+      - POSTGRES_DB=claims_db
+      - POSTGRES_PASSWORD=yourpassword
+    ports:
+      - "5432:5432"

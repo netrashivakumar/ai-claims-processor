@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine,text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+# from .database import engine
 
 # This finds the current file, goes up one folder, and looks for .env
 env_path = Path(__file__).resolve().parent.parent / '.env'
@@ -27,3 +28,8 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def initialize_vector_extension():
+    with engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+        conn.commit()

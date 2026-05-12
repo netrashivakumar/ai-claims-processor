@@ -16,17 +16,52 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    print(f"!!! GLOBAL ERROR CAUGHT: {exc}")
+    return HTTPException(status_code=500, detail=str(exc))
+
 @app.get("/")
 def read_root():
     return {"status": "ok"}
 
 @app.post("/claims/", response_model=schemas.Claim)
 def create_claim(claim: schemas.ClaimCreate, db: Session = Depends(get_db)):
-    db_claim = models.Claim(**claim.model_dump())
-    db.add(db_claim)
-    db.commit()
-    db.refresh(db_claim)
+    # 1. Convert claim data safely
+    try:
+        # This handles both Pydantic v1 (.dict()) and v2 (.model_dump())
+        claim_dict = claim.model_dump() if hasattr(claim, "model_dump") else claim.dict()
+        
+        db_claim = models.Claim(**claim_dict)
+        db.add(db_claim)
+        db.commit()
+        db.refresh(db_claim)
+    except Exception as e:
+        print(f"DATABASE ERROR: {e}")
+        raise HTTPException(status_code=500, detail=f"DB Error: {str(e)}")
+
+    # 2. RabbitMQ Hand-off
+    try:
+        from .producer import send_to_queue
+        
+        # Prepare only essential data for the queue
+        queue_data = {
+            "id": db_claim.id,
+            "policy_number": db_claim.policy_number
+        }
+        
+        send_to_queue(queue_data)
+        print(f"SUCCESS: Claim {db_claim.id} sent to queue.")
+        
+    except Exception as e:
+        # If RabbitMQ fails, we LOG IT but still return the claim
+        # This prevents the 500 error from blocking the user
+        print(f"RABBITMQ ERROR: {e}")
+        
     return db_claim
+
+
+
 
 # The URL will look like: /claims/1
 @app.put("/claims/{id}") 

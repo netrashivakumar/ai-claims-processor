@@ -1,31 +1,29 @@
-from .database import Base
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
-from datetime import datetime
-
+from sqlalchemy.sql import func
+from pgvector.sqlalchemy import Vector
+from .database import Base
 
 class Claim(Base):
     __tablename__ = "claims"
 
     id = Column(Integer, primary_key=True, index=True)
-    policy_number = Column(String, unique=True, index=True, nullable=False)
-    claim_details = Column(Text, nullable=True)
-    status = Column(String, default="pending")  # e.g., pending, processing, completed
-    # status = Column(String, nullable=True)  # e.g., pending, processing, completed
-    created_at = Column(DateTime, default=datetime.utcnow)
+    policy_number = Column(String, index=True)
+    claim_details = Column(Text)
+    status = Column(String, default="Pending")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Relationship to documents
-    documents = relationship("Document", back_populates="claim")
+    # Relationship to the chunks
+    chunks = relationship("DocumentChunk", back_populates="claim")
 
-class Document(Base):
-    __tablename__ = "documents"
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
 
     id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String, nullable=False)
-    file_path = Column(String, nullable=False)
-    uploaded_at = Column(DateTime, default=datetime.utcnow)
-    
     claim_id = Column(Integer, ForeignKey("claims.id"))
+    content = Column(Text, nullable=False)
     
-    # Relationship back to the claim
-    claim = relationship("Claim", back_populates="documents")
+    # 384 dimensions for the local HuggingFace model (all-MiniLM-L6-v2)
+    embedding = Column(Vector(384))
+
+    claim = relationship("Claim", back_populates="chunks")
