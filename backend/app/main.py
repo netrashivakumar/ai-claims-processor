@@ -1,9 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from . import models, schemas, database
-from .database import engine, SessionLocal, get_db, initialize_vector_extension
+from .database import engine, SessionLocal, get_db, initialize_vector_extension, fetch_claims_with_chunks_structured
+from .schemas import Claim
+from typing import List, Dict, Any
 
 # This ensures the extension exists before tables are created
 initialize_vector_extension()
@@ -12,6 +14,7 @@ initialize_vector_extension()
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="AI Claims Processor")
+app = FastAPI(redirect_slashes=True)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # In production, replace "*" with your frontend URL
@@ -63,9 +66,6 @@ def create_claim(claim: schemas.ClaimCreate, db: Session = Depends(get_db)):
         
     return db_claim
 
-
-
-
 # The URL will look like: /claims/1
 @app.put("/claims/{id}") 
 def update_claim(id: int, updated_data: schemas.ClaimUpdate, db: Session = Depends(get_db)):
@@ -85,11 +85,23 @@ def update_claim(id: int, updated_data: schemas.ClaimUpdate, db: Session = Depen
     return db_claim
 
 # 1. GET ALL CLAIMS - Useful for your main dashboard table
-@app.get("/claims/", response_model=list[schemas.ClaimResponse])
-def get_all_claims(db: Session = Depends(get_db)):
-    claims = db.query(models.Claim).all()
-    return claims
-
+# @app.get("/claims/", response_model=list[schemas.ClaimResponse])
+# def get_all_claims(db: Session = Depends(get_db)):
+#     claims = db.query(models.Claim).all()
+#     return claims
+@app.get("/claims/", response_model=List[Claim])
+def get_all_claims(db = Depends(get_db)):
+    try:
+        raw_structured_data = fetch_claims_with_chunks_structured(db)
+        return [Claim.model_validate(item) for item in raw_structured_data]
+        
+    except Exception as err:
+        print(f"Logging Exception Context: {str(err)}")
+        # CRITICAL: You must 'raise' exceptions. Do not 'return' them.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Database execution layer failed: {str(err)}"
+        )
 @app.get("/claims/summary")
 def get_summary(db: Session = Depends(get_db)):
     total_claims = db.query(func.count(models.Claim.id)).scalar()
@@ -120,6 +132,14 @@ def delete_claim(id: int, db: Session = Depends(get_db)):
     
     # 4. Return a confirmation message
     return {"message": f"Claim with ID {id} has been deleted"}
+
+
+@app.post("/upload/")
+async def upload_claim(file: UploadFile = File(...)):
+    # 1. Save file info to PostgreSQL
+    # 2. Push task to RabbitMQ for the AI Worker
+    return {"filename": file.filename, "status": "queued"}
+
 
 
 
